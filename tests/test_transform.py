@@ -61,9 +61,9 @@ def enriched_df():
 
 class TestCleanDataframe:
 
-    def test_date_converted_to_datetime(self, clean_df):
+    def test_date_converted_to_datetime(self, raw_df):
         """The date column should be converted to datetime format"""
-        result = clean_dataframe(clean_df)
+        result = clean_dataframe(raw_df)
         assert pd.api.types.is_datetime64_any_dtype(result["date"]), \
         "Expected 'date' column to be datetime type after cleaning"
 
@@ -81,7 +81,7 @@ class TestCleanDataframe:
             "date"             : ["2023-01-01", "2023-02-01"],
             "country"          : ["United States", "India"]
         })
-        result = clean_dataframe(clean_df)
+        result = clean_dataframe(df)
         assert all(result["country"] == "United States"), \
             "Expected all rows to have country as 'United States' after cleaning"
         
@@ -128,8 +128,8 @@ class TestCalculateReturns:
             "price_day30"  : [120.0]
         })
         result = calculate_returns(df)
-        assert abs(result["return_30day"].iloc[0] - 20.0) < 0.01, \
-            "Expected 30-day return of 20%"
+        assert abs(result["return_immediate"].iloc[0] - 10.0) < 0.01, \
+            "Expected 30-day return of 10%"
         
     def test_return_30day_calculated_correctly(self):
         """The return_30day column should be calculated as (price_day30 - price_before) / price_before * 100"""
