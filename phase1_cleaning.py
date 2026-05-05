@@ -69,7 +69,6 @@ ticker_map = {
     "Zoom": "ZM",
     "DocuSign": "DOCU",
     "Twilio": "TWLO",
-    "Redfin": "RDFN",
     "Rivian": "RIVN",
     "Lucid": "LCID",
     "Unity": "U",
