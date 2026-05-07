@@ -150,10 +150,67 @@ colors = ["#2a9d8f" if v >= importances.median() else "#457b9d" for v in importa
 ax.barh(importances.index, importances.values, color=colors, edgecolor="white")
 ax.set_title("Feature Importance - Random Forest")
 ax.set_xlabel("Importance Score")
-ax.set_facecolor("f9f9f9")
-ax.grid(True, color="dddddd")
+ax.set_facecolor("#f9f9f9")
+ax.grid(True, color="#dddddd")
 ax.spines["top"].set_visible(False)
 plt.tight_layout()
 plt.savefig("visuals/chart8_rf_feature_importance.png", dpi=150)
 plt.show()
 print("Chart 8 Saved!: Feature Importance from Random Forest")
+
+# Chart 3: Comparison of Model Performance Metrics (Bar Chart)
+# Compares accuracy, precision, recall, and F1-score for both models in a single chart for easy comparison.
+
+metrics = ["Accuracy", "Precision", "Recall", "F1-Score"]
+lr_scores = [
+    accuracy_score(y_test, lr_preds),
+    precision_score(y_test, lr_preds),
+    recall_score(y_test, lr_preds),
+    f1_score(y_test, lr_preds),
+]
+rf_scores = [
+    accuracy_score(y_test, rf_preds),
+    precision_score(y_test, rf_preds),
+    recall_score(y_test, rf_preds),
+    f1_score(y_test, rf_preds),
+]
+
+x = np.arange(len(metrics))
+width = 0.35
+
+fig, ax = plt.subplots(figsize=(9, 5))
+bars1 = ax.bar(x - width / 2, lr_scores, width, label="Logistic Regression", color="#457b9d", edgecolor="white")
+bars2 = ax.bar(x + width / 2, rf_scores, width, label="Random Forest", color="#2a9d8f", edgecolor="white")
+
+# Values on top of each bar 
+for bar in bars1:
+    ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.01, 
+            f"{bar.get_height():.2%}", ha="center", fontsize=9)
+
+for bar in bars2:
+    ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.01, 
+            f"{bar.get_height():.2%}", ha="center", fontsize=9)
+    
+ax.set_xticks(x)
+ax.set_xticklabels(metrics)
+ax.set_ylim(0, 1.15)
+ax.set_title("Model Comparison - Logistic Regression vs Random Forest")
+ax.legend()
+ax.set_facecolor("#f9f9f9")
+ax.grid(True, color="#dddddd", axis="y")
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+plt.tight_layout()
+plt.savefig("visuals/chart9_model_comparison.png", dpi=150)
+plt.show()
+print("Chart 9 Saved!: Comparison of Model Performance Metrics")
+
+# Save model results to CSV for use in Streamlit app
+results_df = X_test.copy()
+results_df["actual"] = y_test.values
+results_df["lr_pred"] = lr_preds
+results_df["rf_pred"] = rf_preds
+results_df.to_csv("model_results.csv", index=False)
+print("\nSaved to model_results.csv for Streamlit app!")
+
+print("\nPredictive Modeling Phase Complete! Charts saved in 'visuals' folder and model results saved to 'model_results.csv'.")
