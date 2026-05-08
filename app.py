@@ -9,6 +9,9 @@ from transform import (
     filter_by_company,
     get_summary_stats
 )
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
 
 # Page Configuration
 st.set_page_config(
@@ -28,6 +31,38 @@ def load_data():
     """Load the enriched layoffs dataset produced by phase1_cleaning.py"""
     df = pd.read_csv("layoffs_with_stocks.csv", parse_dates=["date"])
     return df
+
+@st.cache_resource
+def train_model(df):
+    """
+    Train a simple Random Forest on the entire dataset
+    Return the trained model and the label encoder for industry and stage
+    """
+    # Fills Nulls in Categorical Columns
+    df["industry"] = df["industry"].fillna("Unknown")
+    df["stage"] = df["stage"].fillna("Unknown")
+
+    # Encode Categorical Variables
+    le_industry = LabelEncoder()
+    le_stage = LabelEncoder()
+    df["industry_encoded"] = le_industry.fit_transform(df["industry"])
+    df["stage_encoded"] = le_stage.fit_transform(df["stage"])
+
+    # Fill Nulls in Numerical Columns with Median
+    df["percentage_laid_off"] = df["percentage_laid_off"].fillna(df["percentage_laid_off"].median())
+    df["funds_raised"] = df["funds_raised"].fillna(df["funds_raised"].median())
+
+    # Define Features and Target
+    features = ["total_laid_off", "percentage_laid_off", "funds_raised",
+                "industry_encoded", "stage_encoded"]
+    X = df[features].dropna()  # Drop rows with any remaining nulls in features
+    y = df.loc[X.index, "target"]
+
+    # Train Random Forest on full dataset
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model.fit(X, y)
+
+    return model, le_industry, le_stage
 
 df_raw = load_data()
 
@@ -236,6 +271,102 @@ st.download_button(
 )
 
 st.divider()
+
+# Prediction Tool
+st.subheader("🔮 Stock Movement Predictor")
+st.markdown("Enter layoff event details to predict if the stock will go up or down after 30 days.")
+
+# Train model on full dataset
+model, le_industry, le_stage = train_model(df_raw.copy())
+
+# Input Form
+col_p1, col_p2 = st.columns(2)
+
+with col_p1:
+    pred_total_laid_off = st.number_input(
+        "Total Employees Laid Off",
+        min_value=0,
+        max_value=100000,
+        value=1000,
+        step=100,
+        help="How many employees are being laid off?"
+    )
+    pred_pct_laid_off = st.slider(
+        "Percentage of Workforce Laid Off (%)",
+        min_value=0.0,
+        max_value=100.0,
+        value=10.0,
+        step=0.5,
+        help="What percentage of the company's total workforce is being laid off?"
+    )
+
+with col_p2:
+    pred_funds_raised = st.number_input(
+        "Funds Raised ($ Millions)",
+        min_value=0,
+        max_value=500000,
+        value=1000,
+        step=100,
+        help="How much funding has the company raised?"
+    )
+    pred_industry = st.selectbox(
+        "Industry",
+        options=sorted(df_raw["industry"].dropna().unique().tolist()),
+        help="Which industry does the company belong to (e.g., Tech, Finance, Retail)?"
+    )
+    pred_stage = st.selectbox(
+        "Company Stage",
+        options=sorted(df_raw["stage"].dropna().unique().tolist()),
+        help="What's the company's current funding/growth stage?"
+    )
+
+# Run Prediction when Button is Clicked
+if st.button("🔮 Predict Stock Movement", use_container_width=True):
+    # Handle Unseen Labels Gracefully (if industry or stage not in training data, default to most common encoded value)
+    try:
+        industry_enc = le_industry.transform([pred_industry])[0]
+    except ValueError:
+        industry_enc = 0 # Default to 0 if industry not seen during training
+    
+    try:
+        stage_enc = le_stage.transform([pred_stage])[0]
+    except ValueError:
+        stage_enc = 0
+    
+    # Build Input Vector for Prediction
+    input_data = pd.DataFrame([{
+        "total_laid_off": pred_total_laid_off,
+        "percentage_laid_off": pred_pct_laid_off / 100,  # Convert percentage to proportion
+        "funds_raised": pred_funds_raised,
+        "industry_encoded": industry_enc,
+        "stage_encoded": stage_enc
+    }])
+
+    # Get Prediction and Probability
+    prediction = model.predict(input_data)[0]
+    probability = model.predict_proba(input_data)[0]
+    confidence = probability[prediction] * 100
+
+    # Display Result
+    st.markdown("---")
+    if prediction == 1:
+        st.success(f"The model predicts the stock will go **UP** after 30 days")
+    else:
+        st.error(f"The model predicts the stock will go **DOWN** after 30 days")
+
+    # Show Confidence Score
+    col_r1, col_r2 = st.columns(2)
+    col_r1.metric("Model Confidence", f"{confidence:.1f}%")
+    col_r2.metric("Prediction", "Stock Up" if prediction == 1 else "Stock Down")
+
+    # Show Probability Breakdown
+    st.markdown("**Probability Breakdown:**")
+    prob_df = pd.DataFrame({
+        "Outcome": ["Stock Down", "Stock Up"],
+        "Probability": [f"{probability[0]*100:.1f}%", f"{probability[1]*100:.1f}%"]
+    })
+    st.dataframe(prob_df, use_container_width=True, hide_index=True)
+    st.caption("Note: This prediction is based on historical data and should be used for informational purposes only. This should not be considered financial advice.")
 
 # Footer
 st.markdown("Made with ❤️ by [Sachin Sastry] | Data Source: [Layoffs Dataset](https://www.kaggle.com/datasets/benedekrozemberczki/layoffs) | Stock Data and Prices via yfinance")
